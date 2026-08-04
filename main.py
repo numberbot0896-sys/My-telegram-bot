@@ -483,4 +483,36 @@ def main():
     app.add_handler(CallbackQueryHandler(service_menu,      pattern="^set_service$"))
     app.add_handler(CallbackQueryHandler(type_menu,         pattern="^set_type$"))
     app.add_handler(CallbackQueryHandler(length_menu,       pattern="^set_length$"))
-    app.add_handler(CallbackQueryHandler(on_country,  
+    app.add_handler(CallbackQueryHandler(on_country,
+                                             app.add_handler(CommandHandler("start",  cmd_start))
+    app.add_handler(CommandHandler("admin",  show_menu))
+    app.add_handler(CommandHandler("help",   cmd_help))
+    app.add_handler(conv)
+
+    app.add_handler(CallbackQueryHandler(show_menu,         pattern="^menu$"))
+    app.add_handler(CallbackQueryHandler(start_auto_callback, pattern="^start_auto$"))
+    app.add_handler(CallbackQueryHandler(stop_auto_callback,  pattern="^stop_auto$"))
+    app.add_handler(CallbackQueryHandler(send_once_callback,  pattern="^send_once$"))
+    app.add_handler(CallbackQueryHandler(country_menu,      pattern="^set_country$"))
+    app.add_handler(CallbackQueryHandler(service_menu,      pattern="^set_service$"))
+    app.add_handler(CallbackQueryHandler(type_menu,         pattern="^set_type$"))
+    app.add_handler(CallbackQueryHandler(length_menu,       pattern="^set_length$"))
+    app.add_handler(CallbackQueryHandler(on_country,        pattern="^c_"))
+    app.add_handler(CallbackQueryHandler(on_service,        pattern="^s_"))
+    app.add_handler(CallbackQueryHandler(on_type,           pattern="^t_"))
+    app.add_handler(CallbackQueryHandler(on_length,         pattern="^l_"))
+
+    app.add_handler(CallbackQueryHandler(groups_menu,       pattern="^groups$"))
+    app.add_handler(CallbackQueryHandler(grp_remove_list,   pattern="^grp_rm$"))
+    app.add_handler(CallbackQueryHandler(do_remove_group,   pattern="^dg_"))
+
+    app.add_handler(CallbackQueryHandler(admins_menu,       pattern="^admins$"))
+    app.add_handler(CallbackQueryHandler(adm_remove_list,   pattern="^adm_rm$"))
+    app.add_handler(CallbackQueryHandler(do_remove_admin,   pattern="^da_"))
+
+    logging.info("OTP King Bot চালু হচ্ছে ▶")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == "__main__":
+    main()
+                                         
