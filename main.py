@@ -54,7 +54,11 @@ async def show_menu(update: Update, context):
     ])
     
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="Markdown", reply_markup=markup)
+        try:
+            await update.callback_query.answer()
+            await update.callback_query.edit_message_text(text, parse_mode="Markdown", reply_markup=markup)
+        except Exception:
+            await update.callback_query.message.reply_text(text, parse_mode="Markdown", reply_markup=markup)
     else:
         await update.message.reply_text(text, parse_mode="Markdown", reply_markup=markup)
 
@@ -380,3 +384,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
