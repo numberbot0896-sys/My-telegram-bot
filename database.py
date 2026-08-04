@@ -1,9 +1,9 @@
 import aiosqlite
 
-DB_FILE = "bot_database.db"
+DB_NAME = "bot_database.db"
 
 async def init_db():
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
@@ -19,10 +19,33 @@ async def init_db():
         await db.execute("""
             CREATE TABLE IF NOT EXISTS groups (
                 group_id INTEGER PRIMARY KEY,
-                group_name TEXT
+                name TEXT
             )
         """)
         await db.commit()
+
+async def get_groups():
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute("SELECT group_id, name FROM groups") as cursor:
+            rows = await cursor.fetchall()
+            return [{"id": r[0], "name": r[1] or str(r[0])} for r in rows]
+
+async def add_group(group_id: int, name: str = ""):
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO groups (group_id, name) VALUES (?, ?)",
+            (group_id, name)
+        )
+        await db.commit()
+        return True
+
+async def remove_group(group_id: int):
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("DELETE FROM groups WHERE group_id = ?", (group_id,))
+        await db.commit()
+
+# বাকি ডাটাবেজ ফাংশনগুলো আগের মতোই থাকবে...
+        
         
         cursor = await db.execute("SELECT value FROM settings WHERE key = 'country'")
         if not await cursor.fetchone():
