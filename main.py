@@ -15,6 +15,7 @@ from utils import (
 load_dotenv()
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 
+# ১. সাধারণ বাটন (Reply Keyboard - মূল মেনু)
 def get_main_keyboard(is_running: bool):
     send_btn_text = "🔴 অটো-সেন্ড বন্ধ করুন" if is_running else "🚀 অটো-সেন্ড শুরু করুন"
     return ReplyKeyboardMarkup([
@@ -44,7 +45,14 @@ async def show_menu(update: Update, context):
         f"🔗 নাম্বার বট ›  {s.get('number_bot_link') or '—'}\n"
         f"📢 চ্যানেল   ›  {s.get('main_channel_link') or '—'}\n"
     )
-    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
+    
+    # ২. ইনলাইন বাটন (লাইন বাটন / Inline Keyboard) প্যানেলের ভেতরে যুক্ত করা হলো
+    inline_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 রিফ্রেশ প্যানেল", callback_data="refresh_admin"),
+         InlineKeyboardButton("⚙️ সেটিংস পরিবর্তন", callback_data="settings_help")]
+    ])
+
+    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=inline_markup)
 
 async def send_otp_to_groups_and_admin(context, admin_chat_id=None):
     s      = await db.all_settings()
@@ -52,9 +60,9 @@ async def send_otp_to_groups_and_admin(context, admin_chat_id=None):
     if not groups:
         return 0, None
 
-    otp      = generate_otp(int(s.get("otp_length", "5")))
+    otp          = generate_otp(int(s.get("otp_length", "5")))
     country_code = s.get("country", "ET")
-    num_info = generate_virtual_number(country_code)
+    num_info     = generate_virtual_number(country_code)
     service_name = s.get("service", "Facebook")
 
     text = build_message(
@@ -64,6 +72,8 @@ async def send_otp_to_groups_and_admin(context, admin_chat_id=None):
         otp     = otp,
         service = service_name,
     )
+    
+    # গ্রুপে পাঠানোর জন্য ইনলাইন বাটন
     buttons = []
     if s.get("number_bot_link"):
         buttons.append(InlineKeyboardButton("📱 নাম্বার-বট",  url=s["number_bot_link"]))
@@ -79,7 +89,7 @@ async def send_otp_to_groups_and_admin(context, admin_chat_id=None):
         except Exception as e:
             logging.warning("Group %s error: %s", g["id"], e)
 
-    # ইনবক্সে বা অ্যাডেমিনের কাছে ওটিপি পাঠানো
+    # অ্যাডমিনের ইনবক্সে অটোমেটিক কপি পাঠানো
     if admin_chat_id:
         try:
             await context.bot.send_message(
@@ -99,12 +109,12 @@ async def background_otp_sender(context):
             s      = await db.all_settings()
             groups = await db.get_groups()
             if groups:
-                otp      = generate_otp(int(s.get("otp_length", "5")))
+                otp          = generate_otp(int(s.get("otp_length", "5")))
                 country_code = s.get("country", "ET")
-                num_info = generate_virtual_number(country_code)
+                num_info     = generate_virtual_number(country_code)
                 service_name = s.get("service", "Facebook")
                 
-                text     = build_message(
+                text = build_message(
                     masked  = num_info["masked"],
                     flag    = num_info["flag"],
                     country = num_info["country"],
@@ -190,7 +200,7 @@ async def handle_buttons(update: Update, context):
             code = text.split("(")[-1].strip(")")
             await db.put("country", code)
             country_name = COUNTRIES[code][1]
-            await update.message.reply_text(f"✅ কান্ট্রি সেট হয়েছে: *{country_name}*", parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
+            await update.message.reply_text(f"কান্ট্রি সেট হয়েছে: *{country_name}*", parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
         except Exception:
             pass
     elif text == "🧩 সার্ভিস পরিবর্তন":
@@ -200,7 +210,7 @@ async def handle_buttons(update: Update, context):
     elif text.startswith("সার্ভিস: "):
         svc = text.split(": ")[1]
         await db.put("service", svc)
-        await update.message.reply_text(f"✅ সার্ভিস সেট হয়েছে: *{svc}*", parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
+        await update.message.reply_text(f"সার্ভিস সেট হয়েছে: *{svc}*", parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
     elif text == "🔢 OTP দৈর্ঘ্য":
         markup = ReplyKeyboardMarkup([
             [KeyboardButton("দৈর্ঘ্য: 4"), KeyboardButton("দৈর্ঘ্য: 5"), KeyboardButton("দৈর্ঘ্য: 6")],
@@ -265,4 +275,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-                    
+    
