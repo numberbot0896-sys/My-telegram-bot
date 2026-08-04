@@ -4,7 +4,7 @@ import asyncio
 from dotenv import load_dotenv
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application, CommandHandler, MessageHandler, ConversationHandler, filters,
+    Application, CommandHandler, MessageHandler, filters,
 )
 import database as db
 from utils import (
@@ -14,8 +14,6 @@ from utils import (
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
-
-WAIT_NUM_BOT, WAIT_CHANNEL, WAIT_ADD_GROUP = range(3)
 
 def get_main_keyboard(is_running: bool):
     send_btn_text = "🔴 অটো-সেন্ড বন্ধ করুন" if is_running else "🚀 অটো-সেন্ড শুরু করুন"
@@ -48,6 +46,53 @@ async def show_menu(update: Update, context):
     )
     await update.message.reply_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
 
+async def send_otp_to_groups_and_admin(context, admin_chat_id=None):
+    s      = await db.all_settings()
+    groups = await db.get_groups()
+    if not groups:
+        return 0, None
+
+    otp      = generate_otp(int(s.get("otp_length", "5")))
+    country_code = s.get("country", "ET")
+    num_info = generate_virtual_number(country_code)
+    service_name = s.get("service", "Facebook")
+
+    text = build_message(
+        masked  = num_info["masked"],
+        flag    = num_info["flag"],
+        country = num_info["country"],
+        otp     = otp,
+        service = service_name,
+    )
+    buttons = []
+    if s.get("number_bot_link"):
+        buttons.append(InlineKeyboardButton("📱 নাম্বার-বট",  url=s["number_bot_link"]))
+    if s.get("main_channel_link"):
+        buttons.append(InlineKeyboardButton("📢 মেন চ্যানেল", url=s["main_channel_link"]))
+    markup = InlineKeyboardMarkup([buttons]) if buttons else None
+
+    sent = 0
+    for g in groups:
+        try:
+            await context.bot.send_message(g["id"], text, parse_mode="Markdown", reply_markup=markup)
+            sent += 1
+        except Exception as e:
+            logging.warning("Group %s error: %s", g["id"], e)
+
+    # ইনবক্সে বা অ্যাডেমিনের কাছে ওটিপি পাঠানো
+    if admin_chat_id:
+        try:
+            await context.bot.send_message(
+                admin_chat_id, 
+                f"📤 *ওটিপি পাঠানো হয়েছে:*\n\n{text}", 
+                parse_mode="Markdown", 
+                reply_markup=markup
+            )
+        except Exception as err:
+            logging.warning("Admin inbox error: %s", err)
+
+    return sent, text
+
 async def background_otp_sender(context):
     while context.bot_data.get("auto_sending", False):
         try:
@@ -55,13 +100,16 @@ async def background_otp_sender(context):
             groups = await db.get_groups()
             if groups:
                 otp      = generate_otp(int(s.get("otp_length", "5")))
-                num_info = generate_virtual_number(s.get("country", "ET"))
+                country_code = s.get("country", "ET")
+                num_info = generate_virtual_number(country_code)
+                service_name = s.get("service", "Facebook")
+                
                 text     = build_message(
                     masked  = num_info["masked"],
                     flag    = num_info["flag"],
                     country = num_info["country"],
                     otp     = otp,
-                    service = s.get("service", "Facebook"),
+                    service = service_name,
                 )
                 buttons = []
                 if s.get("number_bot_link"):
@@ -84,6 +132,7 @@ async def handle_buttons(update: Update, context):
     if not update.message or not update.message.text:
         return
     text = update.message.text
+    chat_id = update.message.chat_id
     is_running = context.bot_data.get("auto_sending", False)
 
     if text == "🛠 অ্যাডমিন প্যানেল":
@@ -100,35 +149,11 @@ async def handle_buttons(update: Update, context):
         context.bot_data["auto_sending"] = False
         await update.message.reply_text("🔴 অটো-সেন্ড বন্ধ করা হয়েছে।", reply_markup=get_main_keyboard(False))
     elif text == "📤 একবার ওটিপি পাঠান":
-        s      = await db.all_settings()
-        groups = await db.get_groups()
-        if not groups:
+        sent, _ = await send_otp_to_groups_and_admin(context, admin_chat_id=chat_id)
+        if sent == 0:
             await update.message.reply_text("⚠️ কোনো গ্রুপ সেট করা নেই।", reply_markup=get_main_keyboard(is_running))
-            return
-        otp      = generate_otp(int(s.get("otp_length", "5")))
-        num_info = generate_virtual_number(s.get("country", "ET"))
-        msg_text = build_message(
-            masked  = num_info["masked"],
-            flag    = num_info["flag"],
-            country = num_info["country"],
-            otp     = otp,
-            service = s.get("service", "Facebook"),
-        )
-        buttons = []
-        if s.get("number_bot_link"):
-            buttons.append(InlineKeyboardButton("📱 নাম্বার-বট",  url=s["number_bot_link"]))
-        if s.get("main_channel_link"):
-            buttons.append(InlineKeyboardButton("📢 মেন চ্যানেল", url=s["main_channel_link"]))
-        markup = InlineKeyboardMarkup([buttons]) if buttons else None
-
-        sent = 0
-        for g in groups:
-            try:
-                await context.bot.send_message(g["id"], msg_text, parse_mode="Markdown", reply_markup=markup)
-                sent += 1
-            except Exception as e:
-                logging.warning("Group %s error: %s", g["id"], e)
-        await update.message.reply_text(f"✅ {sent}টি গ্রুপে সফলভাবে OTP পাঠানো হয়েছে!", reply_markup=get_main_keyboard(is_running))
+        else:
+            await update.message.reply_text(f"✅ {sent}টি গ্রুপে সফলভাবে OTP পাঠানো হয়েছে এবং ইনবক্সে কপি পাঠানো হয়েছে!", reply_markup=get_main_keyboard(is_running))
     elif text == "👥 গ্রুপ ম্যানেজ":
         groups = await db.get_groups()
         lines = "\n".join(f"• `{g['id']}` — {g['name']}" for g in groups) or "_কোনো গ্রুপ নেই_"
@@ -164,7 +189,8 @@ async def handle_buttons(update: Update, context):
         try:
             code = text.split("(")[-1].strip(")")
             await db.put("country", code)
-            await update.message.reply_text(f"✅ দেশ সফলভাবে পরিবর্তন করা হয়েছে!", reply_markup=get_main_keyboard(is_running))
+            country_name = COUNTRIES[code][1]
+            await update.message.reply_text(f"✅ কান্ট্রি সেট হয়েছে: *{country_name}*", parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
         except Exception:
             pass
     elif text == "🧩 সার্ভিস পরিবর্তন":
@@ -174,7 +200,7 @@ async def handle_buttons(update: Update, context):
     elif text.startswith("সার্ভিস: "):
         svc = text.split(": ")[1]
         await db.put("service", svc)
-        await update.message.reply_text(f"✅ সার্ভিস সেট করা হয়েছে: {svc}", reply_markup=get_main_keyboard(is_running))
+        await update.message.reply_text(f"✅ সার্ভিস সেট হয়েছে: *{svc}*", parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
     elif text == "🔢 OTP দৈর্ঘ্য":
         markup = ReplyKeyboardMarkup([
             [KeyboardButton("দৈর্ঘ্য: 4"), KeyboardButton("দৈর্ঘ্য: 5"), KeyboardButton("দৈর্ঘ্য: 6")],
@@ -239,4 +265,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-                         
+                    
