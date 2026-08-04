@@ -8,16 +8,15 @@ from telegram.ext import (
 )
 import database as db
 from utils import (
-    COUNTRIES, SERVICES, OTP_TYPES,
+    COUNTRIES, SERVICES,
     generate_otp, generate_virtual_number, build_message,
 )
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 
-WAIT_NUM_BOT, WAIT_CHANNEL, WAIT_ADD_GROUP, WAIT_SET_COUNTRY, WAIT_SET_SERVICE, WAIT_SET_LENGTH = range(6)
+WAIT_NUM_BOT, WAIT_CHANNEL, WAIT_ADD_GROUP = range(3)
 
-# সাধারণ নিচে থাকা কিবোর্ড লেআউট
 def get_main_keyboard(is_running: bool):
     send_btn_text = "🔴 অটো-সেন্ড বন্ধ করুন" if is_running else "🚀 অটো-সেন্ড শুরু করুন"
     return ReplyKeyboardMarkup([
@@ -82,6 +81,8 @@ async def background_otp_sender(context):
         await asyncio.sleep(10)
 
 async def handle_buttons(update: Update, context):
+    if not update.message or not update.message.text:
+        return
     text = update.message.text
     is_running = context.bot_data.get("auto_sending", False)
 
@@ -138,7 +139,7 @@ async def handle_buttons(update: Update, context):
         await update.message.reply_text(f"👥 *গ্রুপ তালিকা:*\n{lines}", parse_mode="Markdown", reply_markup=markup)
     elif text == "➕ গ্রুপ যোগ করুন":
         await update.message.reply_text("➕ *গ্রুপ আইডি এবং নাম পাঠান:*\nফরম্যাট: `-1001234567890 | গ্রুপ নাম`\n\nবাতিল করতে /cancel লিখুন", parse_mode="Markdown")
-        return WAIT_ADD_GROUP
+        context.user_data["waiting_for"] = "add_group"
     elif text == "❌ গ্রুপ সরান":
         groups = await db.get_groups()
         if not groups:
@@ -158,7 +159,7 @@ async def handle_buttons(update: Update, context):
     elif text == "🌍 দেশ পরিবর্তন":
         rows = [[KeyboardButton(f"দেশ: {name} ({code})")] for code, (_, name, *_) in COUNTRIES.items()]
         rows.append([KeyboardButton("🔙 মূল মেনু")])
-        await update.message.reply_text("🌍 *দেশ নির্বাচন করুন:*", reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
+        await update.message.reply_text("🌍 *দেশ নির্বাচন করুন:*", parse_mode="Markdown", reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
     elif text.startswith("দেশ: "):
         try:
             code = text.split("(")[-1].strip(")")
@@ -169,7 +170,7 @@ async def handle_buttons(update: Update, context):
     elif text == "🧩 সার্ভিস পরিবর্তন":
         rows = [[KeyboardButton(f"সার্ভিস: {svc}")] for svc in SERVICES]
         rows.append([KeyboardButton("🔙 মূল মেনু")])
-        await update.message.reply_text("🧩 *সার্ভিস নির্বাচন করুন:*", reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
+        await update.message.reply_text("🧩 *সার্ভিস নির্বাচন করুন:*", parse_mode="Markdown", reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
     elif text.startswith("সার্ভিস: "):
         svc = text.split(": ")[1]
         await db.put("service", svc)
@@ -180,7 +181,7 @@ async def handle_buttons(update: Update, context):
             [KeyboardButton("দৈর্ঘ্য: 7"), KeyboardButton("দৈর্ঘ্য: 8")],
             [KeyboardButton("🔙 মূল মেনু")]
         ], resize_keyboard=True)
-        await update.message.reply_text("🔢 *OTP দৈর্ঘ্য নির্বাচন করুন:*", reply_markup=markup)
+        await update.message.reply_text("🔢 *OTP দৈর্ঘ্য নির্বাচন করুন:*", parse_mode="Markdown", reply_markup=markup)
     elif text.startswith("দৈর্ঘ্য: "):
         length = text.split(": ")[1]
         await db.put("otp_length", length)
@@ -190,46 +191,37 @@ async def handle_buttons(update: Update, context):
             [KeyboardButton("সেট নাম্বার বট"), KeyboardButton("সেট চ্যানেল লিংক")],
             [KeyboardButton("🔙 মূল মেনু")]
         ], resize_keyboard=True)
-        await update.message.reply_text("🔗 *লিংক সেটআপ অপশন:*", reply_markup=markup)
+        await update.message.reply_text("🔗 *লিংক সেটআপ অপশন:*", parse_mode="Markdown", reply_markup=markup)
     elif text == "সেট নাম্বার বট":
         await update.message.reply_text("🔗 *নাম্বার বটের লিংক পাঠান:*\n`https://t.me/YourBot`", parse_mode="Markdown")
-        return WAIT_NUM_BOT
+        context.user_data["waiting_for"] = "numbot"
     elif text == "সেট চ্যানেল লিংক":
         await update.message.reply_text("📢 *মেইন চ্যানেলের লিংক পাঠান:*\n`https://t.me/YourChannel`", parse_mode="Markdown")
-        return WAIT_CHANNEL
+        context.user_data["waiting_for"] = "channel"
     elif text == "🔙 মূল মেনু":
+        context.user_data.pop("waiting_for", None)
         await update.message.reply_text("🏠 মূল মেনু:", reply_markup=get_main_keyboard(is_running))
-
-async def save_add_group(update: Update, context):
-    text = update.message.text.strip()
-    is_running = context.bot_data.get("auto_sending", False)
-    if text == "🔙 মূল মেনু" or text == "/cancel":
-        await update.message.reply_text("❌ বাতিল করা হয়েছে।", reply_markup=get_main_keyboard(is_running))
-        return ConversationHandler.END
-    
-    parts = text.split("|")
-    try:
-        gid = int(parts[0].strip())
-        gname = parts[1].strip() if len(parts) > 1 else f"Group {gid}"
-    except ValueError:
-        await update.message.reply_text("❌ সঠিক ফরম্যাটে দিন। উদাহরণ:\n`-1001234567890 | আমার গ্রুপ`")
-        return WAIT_ADD_GROUP
-    
-    await db.add_group(gid, gname)
-    await update.message.reply_text(f"✅ গ্রুপ সফলভাবে যোগ হয়েছে!\nআইডি: `{gid}`\nনাম: {gname}", parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
-    return ConversationHandler.END
-
-async def save_numbot(update: Update, context):
-    is_running = context.bot_data.get("auto_sending", False)
-    await db.put("number_bot_link", update.message.text.strip())
-    await update.message.reply_text("✅ নাম্বার বট লিংক সেভ হয়েছে।", reply_markup=get_main_keyboard(is_running))
-    return ConversationHandler.END
-
-async def save_channel(update: Update, context):
-    is_running = context.bot_data.get("auto_sending", False)
-    await db.put("main_channel_link", update.message.text.strip())
-    await update.message.reply_text("✅ চ্যানেল লিংক সেভ হয়েছে।", reply_markup=get_main_keyboard(is_running))
-    return ConversationHandler.END
+    else:
+        waiting = context.user_data.get("waiting_for")
+        if waiting == "add_group":
+            parts = text.split("|")
+            try:
+                gid = int(parts[0].strip())
+                gname = parts[1].strip() if len(parts) > 1 else f"Group {gid}"
+            except ValueError:
+                await update.message.reply_text("❌ সঠিক ফরম্যাটে দিন। উদাহরণ:\n`-1001234567890 | আমার গ্রুপ`")
+                return
+            await db.add_group(gid, gname)
+            context.user_data.pop("waiting_for", None)
+            await update.message.reply_text(f"✅ গ্রুপ সফলভাবে যোগ হয়েছে!\nআইডি: `{gid}`\nনাম: {gname}", parse_mode="Markdown", reply_markup=get_main_keyboard(is_running))
+        elif waiting == "numbot":
+            await db.put("number_bot_link", text.strip())
+            context.user_data.pop("waiting_for", None)
+            await update.message.reply_text("✅ নাম্বার বট লিংক সেভ হয়েছে।", reply_markup=get_main_keyboard(is_running))
+        elif waiting == "channel":
+            await db.put("main_channel_link", text.strip())
+            context.user_data.pop("waiting_for", None)
+            await update.message.reply_text("✅ চ্যানেল লিংক সেভ হয়েছে।", reply_markup=get_main_keyboard(is_running))
 
 def main():
     token = os.environ.get("BOT_TOKEN")
@@ -238,23 +230,8 @@ def main():
     
     app = Application.builder().token(token).post_init(lambda a: db.init_db()).build()
     
-    conv = ConversationHandler(
-        entry_points=[
-            MessageHandler(filters.Regex("^➕ গ্রুপ যোগ করুন$"), save_add_group),
-            MessageHandler(filters.Regex("^সেট নাম্বার বট$"), save_numbot),
-            MessageHandler(filters.Regex("^সেট চ্যানেল লিংক$"), save_channel),
-        ],
-        states={
-            WAIT_ADD_GROUP: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_add_group)],
-            WAIT_NUM_BOT:   [MessageHandler(filters.TEXT & ~filters.COMMAND, save_numbot)],
-            WAIT_CHANNEL:   [MessageHandler(filters.TEXT & ~filters.COMMAND, save_channel)],
-        },
-        fallbacks=[CommandHandler("cancel", cmd_start)],
-    )
-
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("admin", show_menu))
-    app.add_handler(conv)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
 
     logging.info("বট রান হচ্ছে...")
@@ -262,4 +239,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
+                         
