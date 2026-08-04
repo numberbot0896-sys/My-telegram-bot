@@ -158,14 +158,22 @@ async def groups_menu(update: Update, context):
     ])
     await update.callback_query.edit_message_text(f"👥 *গ্রুপ তালিকা:*\n{lines}", parse_mode="Markdown", reply_markup=markup)
 
-async def ask_add_group(update: Update, context):
-    await update.callback_query.answer()
-    await update.callback_query.edit_message_text(
-        "➕ *গ্রুপ ID পাঠান:*\nউদাহরণ: `-1001234567890`\n\nবাতিল: /cancel",
-        parse_mode="Markdown",
+async def save_add_group(update: Update, context):
+    text = update.message.text.strip()
+    parts = text.split("|") # আইডি এবং নাম আলাদা করার জন্য (যেমন: -100123 | My Group)
+    try:
+        gid = int(parts[0].strip())
+        gname = parts[1].strip() if len(parts) > 1 else f"Group {gid}"
+    except ValueError:
+        await update.message.reply_text("❌ সঠিক ফরম্যাটে দিন। উদাহরণ:\n`-1001234567890 | গ্রুপ নাম`"); return WAIT_ADD_GROUP
+    
+    await db.add_group(gid, gname)
+    await update.message.reply_text(
+        f"✅ গ্রুপ সফলভাবে যোগ হয়েছে!\nআইডি: `{gid}`\nনাম: {gname}", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(kb_back_groups),
     )
-    return WAIT_ADD_GROUP
-
+    return ConversationHandler.END
+    
 async def save_add_group(update: Update, context):
     try:
         gid = int(update.message.text.strip())
