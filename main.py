@@ -333,7 +333,7 @@ async def text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         except ValueError:
             await update.message.reply_text("❌ Please send a valid number.")
 
-      elif setting == "set_template":
+    elif setting == "set_template":
         config["template"] = text
         save_config(config)
         await update.message.reply_text("✅ Template updated!\n\n/admin", reply_markup=admin_panel(config))
