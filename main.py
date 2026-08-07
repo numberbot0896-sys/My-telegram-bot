@@ -56,7 +56,7 @@ default_CONFIG = {
     ),
     "otp_length": 6,
     "use_copy_button": True, # If true, adds a [OTP] copy button
-    "custom_buttons": [] # List of rows, each row is list of dicts
+    "custom_buttons": [] # List of rows, each row is list of dicts,
 }
 
 # Temporary state to know what setting the admin is currently typing
