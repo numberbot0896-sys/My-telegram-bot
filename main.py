@@ -43,7 +43,8 @@ from telegram.ext import (
 CONFIG_FILE = "config.json"
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 
-# Default configDEFAULT_CONFIG = {
+# Default configDEFAULT
+default_CONFIG = {
     "admin_id": None,
     "target_channel": "", # e.g., "@mychannel" or "-100123..."
     "interval_seconds": 10,
@@ -56,6 +57,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
     "otp_length": 6,
     "use_copy_button": True, # If true, adds a [OTP] copy button
     "custom_buttons": [] # List of rows, each row is list of dicts
+}
 
 # Temporary state to know what setting the admin is currently typing
 ADMIN_STATE = {}  # user_id -> "target_channel" | "interval" | "template" | "otp_length"
