@@ -24,7 +24,8 @@ import os
 import random
 import secrets
 from datetime import datetime
-from typing import Any, castfrom telegram import (
+from typing import Any,cast
+from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
