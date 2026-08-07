@@ -196,7 +196,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(
             "✅ You have been set as the Admin!\n\nUse /admin to open the control panel.",
         )
- return
+    return
 
     if is_admin(user_id, config):
         await update.message.reply_text(
