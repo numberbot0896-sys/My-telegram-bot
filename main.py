@@ -49,14 +49,13 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
     "interval_seconds": 10,
     "is_running": False,
     "template": (
-        "╔════════════════════╗\n"
-        "║ {random_emoji} Update #{otp} #EN\n"
-        "╚════════════════════╝"
+        "                    \n"
+        "|| {random_emoji} Update #{otp} #EN\n"
+        "                    "
     ),
     "otp_length": 6,
     "use_copy_button": True, # If true, adds a [OTP] copy button
     "custom_buttons": [] # List of rows, each row is list of dicts
-}
 
 # Temporary state to know what setting the admin is currently typing
 ADMIN_STATE = {}  # user_id -> "target_channel" | "interval" | "template" | "otp_length"
